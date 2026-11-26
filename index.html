@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeatherGPT - Smart AI Weather Assistant</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            weather: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Markdown-It CDN for rendering markdown responses -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="h-full text-slate-100 bg-weather-gradient font-sans antialiased overflow-hidden">
+
+  <!-- Main Container -->
+  <div class="flex h-full w-full overflow-hidden relative">
+
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/60 z-30 transition-opacity duration-300 opacity-0 pointer-events-none lg:hidden"></div>
+
+    <!-- Sidebar (Collapsible on mobile, fixed on desktop) -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-900 transition-transform duration-300 -translate-x-full lg:static lg:translate-x-0">
+      
+      <!-- Sidebar Header -->
+      <div class="flex h-16 items-center justify-between px-6 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-weather-500/10 text-weather-500 rounded-lg">
+            <i data-lucide="cloud-sun" class="w-6 h-6"></i>
+          </div>
+          <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-weather-500 to-indigo-400 bg-clip-text text-transparent">WeatherGPT</span>
+        </div>
+        <!-- Close button (Mobile only) -->
+        <button id="close-sidebar-btn" class="lg:hidden text-slate-400 hover:text-white focus:outline-none p-1.5 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- New Chat Button -->
+      <div class="px-4 py-4">
+        <button id="new-chat-btn" class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-weather-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:from-weather-500 hover:to-indigo-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-weather-500 focus:ring-offset-2 focus:ring-offset-slate-900">
+          <i data-lucide="plus-circle" class="w-5 h-5"></i>
+          <span id="new-chat-btn-text">New Conversation</span>
+        </button>
+      </div>
+
+      <!-- Quick Preset Cities -->
+      <div class="px-6 py-2">
+        <h3 id="popular-cities-title" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Popular Cities</h3>
+        <div class="mt-3 grid grid-cols-2 gap-2" id="preset-cities">
+          <button data-city="Chennai" class="preset-btn flex items-center justify-between rounded-lg bg-slate-800/50 hover:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white border border-slate-800 transition-all">
+            <span>Chennai</span>
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500"></i>
+          </button>
+          <button data-city="Tokyo" class="preset-btn flex items-center justify-between rounded-lg bg-slate-800/50 hover:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white border border-slate-800 transition-all">
+            <span>Tokyo</span>
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500"></i>
+          </button>
+          <button data-city="London" class="preset-btn flex items-center justify-between rounded-lg bg-slate-800/50 hover:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white border border-slate-800 transition-all">
+            <span>London</span>
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500"></i>
+          </button>
+          <button data-city="New York" class="preset-btn flex items-center justify-between rounded-lg bg-slate-800/50 hover:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white border border-slate-800 transition-all">
+            <span>New York</span>
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Favorite Cities Header & List -->
+      <div class="px-6 pt-5 pb-2">
+        <h3 id="favorites-title" class="text-xs font-semibold uppercase tracking-wider text-slate-500">⭐ Favorite Cities</h3>
+      </div>
+      <div class="max-h-48 overflow-y-auto px-4 pb-2 custom-scrollbar" id="favorites-list">
+        <div id="no-favorites-msg" class="text-center py-4 px-4 text-xs text-slate-500 flex flex-col items-center gap-1.5 select-none">
+          <i data-lucide="star" class="w-5 h-5 text-slate-600"></i>
+          <span id="no-favorites-text">No favorites saved</span>
+        </div>
+      </div>
+
+      <!-- Navigation / History Header -->
+      <div class="px-6 pt-4 pb-2">
+        <div class="flex items-center justify-between">
+          <h3 id="recent-searches-title" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Recent Searches</h3>
+          <button id="clear-history-btn" class="text-xs font-medium text-slate-500 hover:text-rose-400 transition-colors focus:outline-none">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent Searches List -->
+      <div class="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar" id="recent-searches-list">
+        <!-- Dynamically populated cities go here -->
+        <div id="no-history-msg" class="text-center py-8 px-4 text-sm text-slate-500 flex flex-col items-center gap-2">
+          <i data-lucide="history" class="w-8 h-8 text-slate-600"></i>
+          <span id="no-history-text">No recent searches</span>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-sm">
+            W
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-slate-200 truncate">WeatherGPT App</p>
+            <p class="text-xs text-slate-500 truncate">FastAPI Web Frontend</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-1 flex-col h-full overflow-hidden bg-slate-950/20">
+
+      <!-- Header -->
+      <header class="flex h-16 items-center justify-between px-6 border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md">
+        <div class="flex items-center gap-4">
+          <!-- Toggle sidebar button (Mobile only) -->
+          <button id="toggle-sidebar-btn" class="lg:hidden text-slate-400 hover:text-white focus:outline-none p-1.5 rounded-lg hover:bg-slate-800">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+          <div class="flex items-center gap-2">
+            <div id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span class="text-sm font-medium text-slate-300">Backend Connected</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <select id="lang-select" class="rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-300 outline-none transition-all duration-150 cursor-pointer select-none">
+            <option value="en">English</option>
+            <option value="ta">தமிழ்</option>
+            <option value="hi">हिंदी</option>
+          </select>
+          <div class="flex rounded-lg border border-slate-800 p-0.5 bg-slate-950/60 shadow-inner select-none">
+            <button id="unit-c-btn" type="button" class="px-2.5 py-1 rounded-md text-xs font-bold transition-all duration-150 focus:outline-none bg-weather-600 text-white shadow-sm cursor-pointer">°C</button>
+            <button id="unit-f-btn" type="button" class="px-2.5 py-1 rounded-md text-xs font-bold transition-all duration-150 focus:outline-none text-slate-400 hover:text-slate-200 cursor-pointer">°F</button>
+          </div>
+          <a href="http://127.0.0.1:8000/docs" target="_blank" class="flex items-center gap-1.5 rounded-lg border border-slate-800 hover:bg-slate-800/60 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-all duration-150">
+            <span>API Docs</span>
+            <i data-lucide="external-link" class="w-3 h-3"></i>
+          </a>
+        </div>
+      </header>
+
+      <!-- Chat Area Container -->
+      <div id="chat-messages-container" class="flex-1 overflow-y-auto px-4 md:px-8 py-6 custom-scrollbar space-y-6">
+        
+        <!-- Welcome Screen (Shown when message history is empty) -->
+        <div id="welcome-screen" class="flex flex-col items-center justify-center min-h-[70vh] text-center max-w-2xl mx-auto px-4">
+          <div class="relative mb-6">
+            <div class="absolute inset-0 bg-weather-500/20 blur-2xl rounded-full weather-glow-sun"></div>
+            <div class="relative p-6 bg-slate-900/60 border border-slate-800 rounded-3xl text-weather-500 shadow-2xl">
+              <i data-lucide="cloud-lightning" class="w-16 h-16 animate-bounce"></i>
+            </div>
+          </div>
+          
+          <h2 class="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            How's the weather today?
+          </h2>
+          <p class="mt-3 text-base text-slate-400 max-w-md">
+            Type any city name below, and I'll fetch real-time forecasts and summarize the current climate conditions for you instantly.
+          </p>
+
+          <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 w-full text-left">
+            <div class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer welcome-suggest-card" data-city="Chennai">
+              <div class="flex items-center gap-3">
+                <i data-lucide="thermometer-sun" class="w-5 h-5 text-amber-400"></i>
+                <h4 class="font-semibold text-sm text-slate-200">Local Weather</h4>
+              </div>
+              <p class="mt-1.5 text-xs text-slate-400 leading-relaxed">Check the current temperature and conditions in Chennai.</p>
+            </div>
+            
+            <div class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer welcome-suggest-card" data-city="Tokyo">
+              <div class="flex items-center gap-3">
+                <i data-lucide="cloud-rain" class="w-5 h-5 text-sky-400"></i>
+                <h4 class="font-semibold text-sm text-slate-200">Tokyo Climate</h4>
+              </div>
+              <p class="mt-1.5 text-xs text-slate-400 leading-relaxed">See if there's any rain forecast in the streets of Tokyo today.</p>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer welcome-suggest-card" data-city="London">
+              <div class="flex items-center gap-3">
+                <i data-lucide="cloud-drizzle" class="w-5 h-5 text-slate-400"></i>
+                <h4 class="font-semibold text-sm text-slate-200">London Fog</h4>
+              </div>
+              <p class="mt-1.5 text-xs text-slate-400 leading-relaxed">Find out if you need an umbrella in London today.</p>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 hover:border-slate-700 hover:bg-slate-900/60 transition-all cursor-pointer welcome-suggest-card" data-city="Sydney">
+              <div class="flex items-center gap-3">
+                <i data-lucide="sun" class="w-5 h-5 text-yellow-500"></i>
+                <h4 class="font-semibold text-sm text-slate-200">Sydney Sun</h4>
+              </div>
+              <p class="mt-1.5 text-xs text-slate-400 leading-relaxed">Check if it is beach weather in Sydney right now.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat History Messages (Appended dynamically) -->
+        <div id="messages-list" class="space-y-6 max-w-4xl mx-auto w-full"></div>
+
+        <!-- Loading / Typing Indicator Element -->
+        <div id="loading-indicator" class="hidden max-w-4xl mx-auto w-full">
+          <div class="flex gap-4 items-start">
+            <div class="w-8 h-8 rounded-xl bg-weather-500/10 text-weather-500 flex items-center justify-center border border-weather-500/20 shrink-0">
+              <i data-lucide="cloud-sun" class="w-4 h-4"></i>
+            </div>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-weather-500">WeatherGPT</span>
+                <span class="text-[10px] text-slate-500 font-medium">Looking up weather...</span>
+              </div>
+              <div class="inline-block p-4 rounded-2xl bg-slate-900/60 border border-slate-800 max-w-xl">
+                <div class="flex items-center gap-2.5">
+                  <div class="flex gap-1">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-slate-400 typing-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-slate-400 typing-dot"></span>
+                  </div>
+                  <span class="text-xs text-slate-400 italic">Querying climate APIs...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Chat Input Footer -->
+      <footer class="p-4 md:p-6 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-md">
+        <div class="max-w-4xl mx-auto">
+          <form id="chat-form" class="relative flex items-center">
+            <button 
+              type="button" 
+              id="location-btn"
+              title="Use my current location"
+              class="absolute left-3.5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none transition-all duration-150"
+            >
+              <i data-lucide="navigation" class="w-4 h-4 md:w-5 h-5"></i>
+            </button>
+            <input 
+              id="city-input"
+              type="text" 
+              autocomplete="off"
+              placeholder="Type a city name (e.g. Chennai, Paris, London)..."
+              class="w-full pl-14 pr-24 py-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 focus:bg-slate-950 border border-slate-800 focus:border-weather-500 focus:ring-1 focus:ring-weather-500 text-slate-100 placeholder-slate-500 shadow-inner outline-none transition-all text-sm md:text-base"
+            />
+            <button 
+              type="button" 
+              id="mic-btn"
+              title="Voice Input"
+              aria-label="Voice Input"
+              class="absolute right-14 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none transition-all duration-150 cursor-pointer"
+            >
+              <i data-lucide="mic" class="w-4 h-4 md:w-5 h-5"></i>
+            </button>
+            <button 
+              type="submit" 
+              id="send-btn"
+              class="absolute right-3.5 p-2.5 rounded-xl bg-weather-600 hover:bg-weather-500 text-white shadow-md hover:shadow-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-weather-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <i data-lucide="send" class="w-4 h-4 md:w-5 h-5"></i>
+            </button>
+            <!-- Autocomplete suggestions dropdown container -->
+            <div id="autocomplete-dropdown" class="hidden absolute bottom-full mb-3 left-0 right-0 z-50 max-h-60 overflow-y-auto rounded-2xl bg-slate-900/95 border border-slate-800 shadow-2xl backdrop-blur-md overflow-hidden divide-y divide-slate-800/40 custom-scrollbar select-none"></div>
+          </form>
+          <div class="mt-3 flex justify-center">
+            <button id="scan-sky-btn" type="button" class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-weather-600 to-indigo-600 hover:from-weather-500 hover:to-indigo-500 text-white rounded-xl shadow-lg shadow-weather-900/20 text-xs md:text-sm font-semibold transition-all hover:-translate-y-0.5 outline-none focus:ring-2 focus:ring-weather-500 focus:ring-offset-2 focus:ring-offset-slate-900">
+              <i data-lucide="camera" class="w-4 h-4"></i>
+              <span class="lang-translatable" data-trans-key="btn_scan_sky">Scan Sky</span>
+            </button>
+          </div>
+          <p class="mt-3 text-center text-[10px] md:text-xs text-slate-500">
+            WeatherGPT fetches real-time updates and delivers rich forecast descriptions.
+          </p>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Camera Modal (Desktop/Mobile unified) -->
+  <div id="camera-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col scale-95 transition-transform duration-300" id="camera-modal-content">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
+        <h3 class="text-slate-100 font-semibold flex items-center gap-2"><i data-lucide="camera" class="w-4 h-4 text-weather-500"></i> Weather Vision</h3>
+        <button id="close-camera-btn" type="button" class="text-slate-400 hover:text-slate-200 transition-colors focus:outline-none"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      
+      <div class="p-0 flex flex-col items-center justify-center bg-black relative" style="min-height: 280px;">
+        <video id="camera-video" class="w-full h-auto max-h-[50vh] object-contain hidden" autoplay playsinline></video>
+        <canvas id="camera-canvas" class="hidden"></canvas>
+        <div id="camera-loading" class="hidden text-slate-400 flex flex-col items-center gap-3 absolute inset-0 justify-center">
+           <i data-lucide="loader-2" class="w-8 h-8 opacity-60 animate-spin"></i>
+           <span class="text-sm font-medium">Initializing camera...</span>
+        </div>
+        <div id="camera-error" class="hidden text-rose-400 text-sm text-center px-6 absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90 backdrop-blur-md">
+           <i data-lucide="camera-off" class="w-8 h-8 text-rose-500/80 mb-1"></i>
+           <span id="camera-error-msg">Camera unavailable.</span>
+        </div>
+        <!-- Default State before WebRTC starts -->
+        <div id="camera-idle" class="text-slate-500 flex flex-col items-center gap-3 absolute inset-0 justify-center">
+           <i data-lucide="image" class="w-12 h-12 opacity-30"></i>
+           <span class="text-sm">Select an option below</span>
+        </div>
+      </div>
+      
+      <div class="p-4 flex gap-3 border-t border-slate-800 bg-slate-900/80">
+        <input type="file" id="scan-sky-native-input" accept="image/*" capture="environment" class="hidden" />
+        <input type="file" id="scan-sky-upload-input" accept="image/*" class="hidden" />
+        <button id="capture-photo-btn" type="button" class="flex-1 bg-weather-600 hover:bg-weather-500 text-white py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors outline-none focus:ring-2 focus:ring-weather-500">
+          <i data-lucide="camera" class="w-4 h-4"></i> Take Photo
+        </button>
+        <button id="upload-photo-btn" type="button" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors outline-none focus:ring-2 focus:ring-slate-500">
+          <i data-lucide="upload" class="w-4 h-4"></i> Upload File
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Logic -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
